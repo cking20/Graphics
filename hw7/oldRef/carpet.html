@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+div.container {
+    width: 100%;
+    border: 1px solid gray;
+}
+
+header, footer {
+    padding: 1em;
+    color: white;
+    background-color: black;
+    clear: left;
+    text-align: center;
+}
+
+nav {
+    float: left;
+    max-width: 160px;
+    margin: 0;
+    padding: 1em;
+}
+
+nav ul {
+    list-style-type: none;
+    padding: 0;
+}
+   
+nav ul a {
+    text-decoration: none;
+}
+
+article {
+    margin-left: 170px;
+    border-left: 1px solid gray;
+    padding: 1em;
+    overflow: hidden;
+}
+</style>
+
+<script src="carpet.js"></script>
+<script src="MV.js"></script>
+
+<script id="vertex-shader" type="x-shader/x-vertex">
+	    precision mediump float;
+        attribute vec4 coordinates;
+		attribute vec4 center;
+		attribute vec2 vTexCoord;
+		attribute vec4 vNorm;
+		uniform vec3 theta;
+		uniform vec4 lightPos;
+		uniform mat4 modelViewMatrix;
+		uniform mat4 projectionMatrix;
+		uniform vec4 objCenter;
+		uniform vec4 camPos;
+		
+		varying vec2 fTexCoord;
+		varying vec3 N, surfToLight, surfToCam;
+		varying mat4 modVMat;
+
+        void main(void) {
+			vec3 c = cos( theta );
+			vec3 s = sin( theta );
+			//column-major!!!!(so fliped along major diag)
+			mat4 rx = mat4( 1.0,  0.0,  0.0, 0.0,
+							0.0,  c.x,  s.x, 0.0,
+							0.0, -s.x,  c.x, 0.0,
+							0.0,  0.0,  0.0, 1.0 );
+			mat4 ry = mat4( c.y, 0.0, -s.y, 0.0,
+							0.0, 1.0,  0.0, 0.0,
+							s.y, 0.0,  c.y, 0.0,
+							0.0, 0.0,  0.0, 1.0 );
+			mat4 rz = mat4( c.z, s.z, 0.0, 0.0,
+							-s.z,  c.z, 0.0, 0.0,
+							0.0,  0.0, 1.0, 0.0,
+							0.0,  0.0, 0.0, 1.0 );
+		  
+		  vec4 p = coordinates;
+		  p = p - center;
+		  p = rz * ry * rx * p;
+		  p = p + center;
+		 
+		  fTexCoord = vTexCoord;
+		 		  
+          gl_Position = projectionMatrix * modelViewMatrix *p;// + objCenter - camPos;
+        
+		  vec3 pos = -(modelViewMatrix *p).xyz;
+		  vec3 light = lightPos.xyz;
+          surfToLight = normalize( light - pos );
+		  surfToCam =  normalize(camPos.xyz-pos);
+		  N = normalize((modelViewMatrix* vNorm).xyz);
+		  modVMat = modelViewMatrix;
+		
+		}
+</script>
+
+<script id="fragment-shader" type="x-shader/x-fragment">
+      precision mediump float;
+	  
+	  varying  vec2 fTexCoord;
+	  uniform sampler2D texture;
+	  uniform sampler2D normalMap;
+	  uniform sampler2D bumpMap;
+	  uniform vec4 ambientProduct;
+	  uniform vec4 diffuseProduct;
+	  uniform vec4 specularProduct;
+	  uniform float shininess;
+	  varying vec3 N, surfToLight, surfToCam;
+	  varying mat4 modVMat;
+	  
+      void main(void) {
+	    vec3 No = (normalize(modVMat * texture2D(normalMap, fTexCoord))).xyz;
+		vec3 Bp = (normalize(modVMat * texture2D(bumpMap, fTexCoord))).xyz;
+		
+		//No = Bp;
+		vec4 fColor;
+		vec3 H = normalize( surfToLight + surfToCam );
+		vec3 R = normalize(reflect(-surfToLight,No));
+		//ambient
+		vec4 ambient = ambientProduct;
+		//diffuse
+		float Kd = max( dot(surfToLight, No), 0.0 );
+		vec4  diffuse = Kd*diffuseProduct;
+		//specular
+		float Ks = pow( max(0.0, dot(surfToCam, R)), shininess );
+		vec4  specular = Ks * specularProduct;
+		//if( dot(surfToLight, No) < 0.0 ) specular = vec4(0.0, 0.0, 0.0, 1.0);
+		specular = clamp(specular, 0.0, 1.0);
+		fColor = diffuse + ambient + specular;
+		
+		//fColor.a = 1.0;
+		fColor.x = fColor.x;// * texture2D(texture, fTexCoord).x;
+		fColor.y = fColor.y;// * texture2D(texture, fTexCoord).y;
+		fColor.z = fColor.z;// * texture2D(texture, fTexCoord).z;
+		fColor.w = 1.0;
+		fColor   = fColor;
+		fColor.a = 1.0;
+        gl_FragColor = fColor;
+      }
+</script>
+
+</head>
+<body>
+
+<div class="container">
+
+<header>
+   <h1>Carpet</h1>
+</header>
+  
+<nav>
+  <ul>
+    <li><a href="carpet.html">Carpet</a></li>
+  </ul>
+</nav>
+
+<article>
+    
+	<p>Num Divisions:<input type="range" id="myRange" value="2" max="6" onchange="run()"></p>
+	<input type= "button" value = "Rotate" id="myRotateToggle" onchange="rotationButtonClicked()">
+	<!--<p>Camera X Pos: <input type="range" id="camXRange" step="0.01" value="0.01" max="2" min="-2" onchange="updateCamPos()"></p>/-->
+	<p>Camera Y Position: <input type="range" id="camYRange" step="0.01" value="0.01" max="2" min="-2" onchange="updateCamPos()"></p>
+	<p>Camera Distance: <input type="range" id="camZRange" step="0.01" value="1" max="10" min="0.01" onchange="updateCamPos()"></p>
+	<p>Light X: <input type="range" id="lightXRange" step="0.01" value="1" max="2" min="-2" onchange="updateLightNMat()"></p>
+	<p>Light Y: <input type="range" id="lightYRange" step="0.01" value="1" max="2" min="-2" onchange="updateLightNMat()"></p>
+	<p>Light Z: <input type="range" id="lightZRange" step="0.01" value="1" max="2" min="-2" onchange="updateLightNMat()"></p>
+	
+	<p>Light Color: <input type="color" id="litC" onchange="updateLightNMat()"></p>
+	<p>Light Ambi: <input type="range" id="lightA" step="0.001" value=".1" max="1" min="0" onchange="updateLightNMat()"></p>
+	<p>Light Diff: <input type="range" id="lightD" step="0.001" value=".1" max="1" min="0" onchange="updateLightNMat()"></p>
+	<p>Light Spec: <input type="range" id="lightS" step="0.001" value=".1" max="1" min="0" onchange="updateLightNMat()"></p>
+	
+	<p>Mat Color: <input type="color" id="matC" onchange="updateLightNMat()"></p>
+	<p>Mat Ambi: <input type="range" id="matA" step="0.001" value=".1" max="1" min="0" onchange="updateLightNMat()"></p>
+	<p>Mat Diff: <input type="range" id="matD" step="0.001" value=".1" max="1" min="0" onchange="updateLightNMat()"></p>
+	<p>Mat Spec: <input type="range" id="matS" step="0.001" value=".1" max="1" min="0" onchange="updateLightNMat()"></p>
+	<p>Mat Shine: <input type="range" id="matSh" step="0.001" value=".1" max="10" min="0.01" onchange="updateLightNMat()"></p>
+	
+	<div>
+		<canvas width="750" height="750" id="mainCanvas"></canvas>
+	</div>
+	<img src="img.png" alt="LOL" id="image" style="width:1024px;height:1024px;">
+	<img src="nrm.png" alt="LOL" id="normal" style="width:256px;height:256px;">
+	<img src="bmp.png" alt="LOL" id="bump" style="width:256px;height:256px;">
+	
+	</article>
+<iframe width="560" height="315" src="https://www.youtube.com/embed/lCuY_esXnRE" frameborder="0" allowfullscreen></iframe>
+<footer>Footer</footer>
+
+</div>
+
+</body>
+</html>
+

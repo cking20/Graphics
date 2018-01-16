@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+div.container {
+    width: 100%;
+    border: 1px solid gray;
+}
+
+header, footer {
+    padding: 1em;
+    color: white;
+    background-color: black;
+    clear: left;
+    text-align: center;
+}
+
+nav {
+    float: left;
+    max-width: 160px;
+    margin: 0;
+    padding: 1em;
+}
+
+nav ul {
+    list-style-type: none;
+    padding: 0;
+}
+   
+nav ul a {
+    text-decoration: none;
+}
+
+article {
+    margin-left: 170px;
+    border-left: 1px solid gray;
+    padding: 1em;
+    overflow: hidden;
+}
+</style>
+
+<script src="carpet.js"></script>
+
+<script id="vertex-shader" type="x-shader/x-vertex">
+        precision mediump float;
+        attribute vec2 coordinates;
+		uniform float theta;
+        void main(void) {
+		  float s = sin(theta);
+		  float c = cos(theta);
+		  mat2 m = mat2(c,-s,s,c);
+          gl_Position = vec4(coordinates * m, 0.0, 1.0);
+        }
+</script>
+
+<script id="fragment-shader" type="x-shader/x-fragment">
+      precision mediump float;
+      void main(void) {
+         gl_FragColor = vec4(.5, 1.0, 1.0, 1.0);
+      }
+</script>
+
+</head>
+<body>
+
+<div class="container">
+
+<header>
+   <h1>Carpet</h1>
+</header>
+  
+<nav>
+  <ul>
+    <li><a href="carpet.html">Carpet</a></li>
+  </ul>
+</nav>
+
+<article>
+    
+	<input type="range" id="myRange" value="3" max="6" onchange="run()">
+	<input type= "button" id="myRotateToggle" onchange="rotationButtonClicked()">
+	
+	<div>
+		<canvas width="750" height="750" id="mainCanvas"></canvas>
+	</div>
+</article>
+
+<footer>Footer</footer>
+
+</div>
+
+</body>
+</html>
+
